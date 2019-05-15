@@ -1,6 +1,8 @@
 from django.shortcuts import render
 
 # Create your views here.
+from libs.yuntongxun.sms import CCP
+
 """
 图片验证码的需求
 
@@ -66,12 +68,39 @@ class ImageCodeView(View):
 
 """
 短信验证码需求分析：
-1.验证图形验证码通过
-2.生成短信验证码
-3.
-
+1.点击发送短信验证码的时候，前端搜集 校验手机号， 图形验证码， uuid 这些东西发送给后端
+2.后端接收这些数据，验证数据，生成短信验证码，然后保存短信验证码， 发送验证码，返回响应
 
 
 
 
 """
+
+class SMSCodeView():
+    #1.后端要接收的数据
+    def get(self,request,mobile):
+        uuid = request.GET.get('image_code_id') #图片验证码的UUID
+        text_client = request.GET.get('image_code') #用户输入的图片验证码
+     #2.验证数据 ： 2.1对比用户提交的图片验证码和redis存储的是否一致
+                #2.2 redis 中的图片验证码有可能过期，判断是否过期
+        from django_redis import  get_redis_connection
+        redis_conn = get_redis_connection('code')
+        text_server = redis_conn.get('img_%s'% uuid)
+        if text_server is None:
+            return  http.HttpResponseBadRequest("验证码已过期")
+        if text_client != text_server:
+            return http.HttpResponseBadRequest("图片验证码不一致")
+        #开始生成短信验证码
+
+        from random import randint
+        sms_code = randint(1000,9999)
+        #保存短信验证码
+        redis_conn.setex('sms_%s'%mobile ,300,sms_code)
+        #发送短信验证码
+
+        CCP().send_template_sms(mobile, [sms_code, 5], 1)
+
+        # 返回响应
+        return http.JsonResponse({'code':200})
+
+
