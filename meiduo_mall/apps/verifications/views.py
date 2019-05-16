@@ -1,7 +1,14 @@
-from django.shortcuts import render
-
-# Create your views here.
+from apps.verifications.content import SMS_CODE_EXPIRE_TIME
+from apps.views import logger
 from libs.yuntongxun.sms import CCP
+from django import http
+from django.shortcuts import render
+from django.http import JsonResponse
+from django_redis import get_redis_connection
+from libs.captcha.captcha import captcha
+from django.views import View
+from random import randint
+from celery_tasks.sms.tasks import send_sms_code
 
 """
 图片验证码的需求
@@ -19,17 +26,8 @@ from libs.yuntongxun.sms import CCP
     2.生成图片验证码,和保存图片验证码的内容
     3.把图片返回给浏览器
 """
-from django import http
-from django.shortcuts import render
 
-# Create your views here.
-from django.views import View
 
-#from libs.yuntongxun.sms import CCP
-
-from django.http import JsonResponse
-from django_redis import get_redis_connection
-from libs.captcha.captcha import captcha
 
 class ImageCodeView(View):
 
@@ -42,8 +40,9 @@ class ImageCodeView(View):
         # generate_captcha 它返回2个值,第一个值是 图片验证码的内容
         # 第二个值是图片验证码的二进制图片
         text,code,image = captcha.generate_captcha()
-        #print("code:",code)
-        #print("text:",text)
+        # print("code:",code)
+        # print("text:",text)
+        # print("image:",image)
 
             # 2.2 保存图片验证码的内容 redis
         #2.2.1 连接redis
@@ -52,7 +51,7 @@ class ImageCodeView(View):
         #2.2.2 保存数据
         # redis_conn.setex(键,过期时间,值)
         # redis_conn.setex(key,expire,value)
-        redis_conn.setex('img_%s'%uuid,120,text)
+        redis_conn.setex('img_%s'%uuid,120,code)
         # 3.把图片返回给浏览器
         # application/json
 
@@ -76,31 +75,53 @@ class ImageCodeView(View):
 
 """
 
-class SMSCodeView():
+
+class SMSCodeView(View):
+
     #1.后端要接收的数据
     def get(self,request,mobile):
         uuid = request.GET.get('image_code_id') #图片验证码的UUID
-        text_client = request.GET.get('image_code') #用户输入的图片验证码
+        text_client = request.GET.get('image_code').lower() #用户输入的图片验证码
      #2.验证数据 ： 2.1对比用户提交的图片验证码和redis存储的是否一致
                 #2.2 redis 中的图片验证码有可能过期，判断是否过期
-        from django_redis import  get_redis_connection
-        redis_conn = get_redis_connection('code')
-        text_server = redis_conn.get('img_%s'% uuid)
-        if text_server is None:
-            return  http.HttpResponseBadRequest("验证码已过期")
-        if text_client != text_server:
-            return http.HttpResponseBadRequest("图片验证码不一致")
+        try:
+            redis_conn = get_redis_connection('code')
+            text_server = redis_conn.get('img_%s'% uuid).decode().lower()
+
+            if text_server is None:
+                return  http.HttpResponseBadRequest("验证码已过期")
+            if text_client != text_server:
+                return http.HttpResponseBadRequest("图片验证码不一致")
+
+            #判断完成之后，删除 redis 中已经获取的图片验证内容
+            redis_conn.delete("img_%s"%uuid)
+        except Exception as e:
+            logger.error(e)
+            return  http.HttpResponseBadRequest("数据库链接问题")
+
         #开始生成短信验证码
 
-        from random import randint
         sms_code = randint(1000,9999)
         #保存短信验证码
-        redis_conn.setex('sms_%s'%mobile ,300,sms_code)
-        #发送短信验证码
+        # 4.1 通过redis的连接 创建管道实例
+        pl = redis_conn.pipeline()
+        # 4.2 将redis指令 缓存在管道中
+        # redis_conn.setex(key,expires,value)
+        pl.setex('sms_%s' % mobile, SMS_CODE_EXPIRE_TIME, sms_code)
 
-        CCP().send_template_sms(mobile, [sms_code, 5], 1)
+        # 生成一个标记位 标记位为1  表示已经发送了
+        pl.setex('send_flag_%s' % mobile, 60, 1)
+        # 4.3 通过execute来执行管道
+        pl.execute()
+        redis_conn.setex('sms_%s'%mobile ,300,sms_code)
+        #发送短信验证码 改用异步celery
+
+        #CCP().send_template_sms(mobile, [sms_code, SMS_CODE_EXPIRE_TIME], 1)
+
+        #改用 celery
+        send_sms_code.delay(mobile, sms_code)
 
         # 返回响应
-        return http.JsonResponse({'code':200})
+        return http.JsonResponse({'code':0})
 
 

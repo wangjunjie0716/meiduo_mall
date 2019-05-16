@@ -114,10 +114,10 @@ var vm = new Vue({
         check_mobile: function () {
             var re = /^1[345789]\d{9}$/;
             if (re.test(this.mobile)) {
-                this.error_phone = false;
+                this.error_mobile = false;
             } else {
                 this.error_mobile_message = '您输入的手机号格式不正确';
-                this.error_phone = true;
+                this.error_mobile = true;
             }
 
         },
