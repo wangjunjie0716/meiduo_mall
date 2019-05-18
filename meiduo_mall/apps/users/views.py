@@ -1,4 +1,4 @@
-from django.contrib.auth import login, authenticate
+from django.contrib.auth import login, authenticate, logout
 from django.shortcuts import render, redirect
 from django.views import View
 import re
@@ -116,6 +116,56 @@ class LoginView(View):
             # 记住用户：None表示两周后过期
             request.session.set_expiry(None)
 
+            # 8.返回相应 设置cookie
+        response = redirect(reverse('content:index'))
+            # 设置cookie信息
+            # response.set_cookie(key,value,max_age=)
+        if remembered != 'on':
+                # 说明不需要记住
+            response.set_cookie('username', user.username, max_age=None)
+        else:
+                # 需要记住
+            response.set_cookie('username', user.username, max_age=14 * 24 * 3600)
+
+
+
             # 响应登录结果
-        return redirect(reverse('content:index'))
+        return response
+
+
+class LogoutView(View):
+    def get(self,request):
+        """实现退出登录逻辑"""
+        # 清理session
+        logout(request)
+        # 退出登录，重定向到登录页
+        response = redirect(reverse('content:index'))
+        # 退出登录时清除cookie中的username
+        response.delete_cookie('username')
+        return response
+
+
+class UserCenterInfo(View):
+
+    def get(self,request):
+        context = {
+            'username': request.user.username,
+            'mobile': request.user.mobile,
+            'email': request.user.email,
+            #'email_active': request.user.email_active
+        }
+        if request.user.is_authenticated():
+            return render(request, 'user_center_info.html',context=context)
+        else:
+            return redirect(reverse('users:login'))
+
+
+
+
+
+
+
+
+
+
 
