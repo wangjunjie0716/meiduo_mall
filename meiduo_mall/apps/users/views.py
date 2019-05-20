@@ -1,4 +1,7 @@
+import json
+
 from django.contrib.auth import login, authenticate, logout
+
 from django.shortcuts import render, redirect
 from django.views import View
 import re
@@ -116,8 +119,14 @@ class LoginView(View):
             # 记住用户：None表示两周后过期
             request.session.set_expiry(None)
 
+        next = request.GET.get('next')
+        if next:
+            response =redirect(next)
+        else:
+            response = redirect(reverse('content:index'))
+
             # 8.返回相应 设置cookie
-        response = redirect(reverse('content:index'))
+        #response = redirect(reverse('content:index'))
             # 设置cookie信息
             # response.set_cookie(key,value,max_age=)
         if remembered != 'on':
@@ -145,19 +154,68 @@ class LogoutView(View):
         return response
 
 
-class UserCenterInfo(View):
+# class UserCenterInfo(View):
+#
+#     def get(self,request):
+#         context = {
+#             'username': request.user.username,
+#             'mobile': request.user.mobile,
+#             'email': request.user.email,
+#             'email_active': request.user.email_active
+#         }
+#         if request.user.is_authenticated():
+#             return render(request, 'user_center_info.html',context=context)
+#         else:
+#             return redirect(reverse('users:login'))
 
+
+from django.contrib.auth.mixins import LoginRequiredMixin
+
+class UserCenterInfo(LoginRequiredMixin,View):
+    # 必须是登陆用户才可以访问
+    # 如果用户没有登陆，默认会调转到系统的　登陆路由
+    #系统的默认登陆路由是：/accounts/login/
+    #
     def get(self,request):
+
+        #1.获取指定的数据组织上下文
         context = {
-            'username': request.user.username,
-            'mobile': request.user.mobile,
-            'email': request.user.email,
-            #'email_active': request.user.email_active
+            'username':request.user.username,
+            'mobile':request.user.mobile,
+            'email':request.user.email,
+            'email_active':request.user.email_active
         }
-        if request.user.is_authenticated():
-            return render(request, 'user_center_info.html',context=context)
-        else:
-            return redirect(reverse('users:login'))
+
+        return render(request,'user_center_info.html',context=context)
+
+
+class Save_EmailView(View):
+    #需求：当用户在邮件输入框中，输入一个邮件地址后，点击保存按钮，前端讲邮箱信息发送给后端
+    #后端：需要确定请求方式和路由
+    #大体步骤：１．必须是登录用户才可以更新邮箱信息，　２．接收用户提交的邮箱信息　３．验证邮箱信息是否符合邮箱规则，４．保存数据５．返回相应
+    def put(self,request):
+        #email =  request.GET.get('email')
+        body = request.body
+        body_str = body.decode()
+        data = json.loads(body_str)
+        email = data.get("email")
+        if not all([email]):
+            return http.JsonResponse('请输入邮箱地址')
+        if not re.match(r'^[A-Za-z\d]+([-_.][A-Za-z\d]+)*@([A-Za-z\d]+[-.])+[A-Za-z\d]{2,4}$',email):
+            return http.JsonResponse('请输入正确的邮箱地址')
+        if not request.user.is_authenticated():
+            return http.JsonResponse("请先登入")
+        #更新数据
+        try:
+            request.user.email = email
+            request.user.save()
+        except Exception as e:
+            logger.error(e)
+            return http.HttpResponse("保存失败")
+        #发送激活邮件
+        #返回响应
+        return  http.JsonResponse("ok")
+
 
 
 
