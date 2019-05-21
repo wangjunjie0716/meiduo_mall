@@ -45,7 +45,7 @@ var vm = new Vue({
         save_email(){
             // 检查email格式
             this.check_email();
-
+            console.log(this.error_email == false)
             if (this.error_email == false) {
                 var url = this.host + '/emails/';
                 axios.put(url, {

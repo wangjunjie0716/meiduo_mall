@@ -14,7 +14,7 @@ from django.db import DatabaseError
 
 # Create your views here.
 from apps.views import logger
-
+from utils.response_code import RETCODE
 
 class RegisterView(View):
     def get(self, request):
@@ -188,7 +188,7 @@ class UserCenterInfo(LoginRequiredMixin,View):
 
         return render(request,'user_center_info.html',context=context)
 
-
+from django.contrib.auth.mixins import  LoginRequiredMixin
 class Save_EmailView(View):
     #需求：当用户在邮件输入框中，输入一个邮件地址后，点击保存按钮，前端讲邮箱信息发送给后端
     #后端：需要确定请求方式和路由
@@ -200,21 +200,34 @@ class Save_EmailView(View):
         data = json.loads(body_str)
         email = data.get("email")
         if not all([email]):
-            return http.JsonResponse('请输入邮箱地址')
+            return http.JsonResponse({'code':RETCODE.PARAMERR,'errmsg':'参数错误'})
         if not re.match(r'^[A-Za-z\d]+([-_.][A-Za-z\d]+)*@([A-Za-z\d]+[-.])+[A-Za-z\d]{2,4}$',email):
-            return http.JsonResponse('请输入正确的邮箱地址')
+            return http.JsonResponse({'code':RETCODE.PARAMERR,'errmsg':'参数错误'})
         if not request.user.is_authenticated():
-            return http.JsonResponse("请先登入")
+            return http.JsonResponse({'code':RETCODE.SESSIONERR,'errmsg':'未登录'})
         #更新数据
         try:
             request.user.email = email
             request.user.save()
         except Exception as e:
             logger.error(e)
-            return http.HttpResponse("保存失败")
+            return http.HttpResponse({'code':RETCODE.DBERR,'ermsg':'更新错误'})
         #发送激活邮件
+        from django.core.mail import send_mail
+        subject = '主题'
+        message = 'message'
+        recipient_list = [email]
+        from_email = 'junjie90716@163.com'
+        html_message = "<a href='#'>这是美多商场激活链接</a>"
+        send_mail(
+            subject= subject,
+            message = html_message,
+            recipient_list=recipient_list,
+            from_email = from_email
+        )
+
         #返回响应
-        return  http.JsonResponse("ok")
+        return  http.JsonResponse({'code':RETCODE.OK,'errmsg':'ok'})
 
 
 
