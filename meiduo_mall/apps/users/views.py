@@ -13,6 +13,7 @@ from apps.users.models import User
 from django.db import DatabaseError
 
 # Create your views here.
+from apps.users.utils import generic_verify_email_url, check_veryfy_email_token
 from apps.views import logger
 from utils.response_code import RETCODE
 
@@ -218,18 +219,60 @@ class Save_EmailView(View):
         message = 'message'
         recipient_list = [email]
         from_email = 'junjie90716@163.com'
-        html_message = "<a href='#'>这是美多商场激活链接</a>"
-        send_mail(
-            subject= subject,
-            message = html_message,
-            recipient_list=recipient_list,
-            from_email = from_email
-        )
+        html_message = "<a href='#'>戳我,戳我,戳我有惊喜</a>"
 
+        #将代码换成异步代码
+        # send_mail(
+        #     subject= subject,
+        #     message = html_message,
+        #     recipient_list=recipient_list,
+        #     from_email = from_email
+        # )
+        verify_url = generic_verify_email_url(request.user.id)
+
+        html_message = '<p>尊敬的用户您好！</p>' \
+                       '<p>感谢您使用美多商城。</p>' \
+                       '<p>您的邮箱为：%s 。请点击此链接激活您的邮箱：</p>' \
+                       '<p><a href="%s">%s<a></p>' % (email, verify_url, verify_url)
+
+        from celery_tasks.email.tasks import send_verify_email
+
+        send_verify_email.delay(
+                    subject= subject,
+                    message = message,
+                    recipient_list=recipient_list,
+                    from_email = from_email,
+                    html_message =html_message)
         #返回响应
         return  http.JsonResponse({'code':RETCODE.OK,'errmsg':'ok'})
 
 
+class EmailVerifyView(View):
+
+    def get(self,request):
+        # 1.接收token
+        token = request.GET.get('token')
+        if token is None:
+            return http.HttpResponseBadRequest('参数错误')
+        # 2.验证token
+        user_id = check_veryfy_email_token(token)
+        if user_id is None:
+            return http.HttpResponseBadRequest('参数错误')
+        # 3.根据user_id查询用户信息
+        try:
+            # pk primary key 主键的意思
+            # 如果我们不记得主键是哪个字段的时候,可以直接使用pk
+            # 系统会自动使用主键
+            # user = User.objects.get(id=user_id)
+            user = User.objects.get(pk=user_id)
+            # 4.改变用户信息
+            if user is not None:
+                user.email_active=True
+                user.save()
+        except User.DoesNotExist:
+            return http.HttpResponseBadRequest('参数错误')
+        # 5.返回相应(跳转到个人中心页面)
+        return redirect(reverse('users:user_center_info'))
 
 
 

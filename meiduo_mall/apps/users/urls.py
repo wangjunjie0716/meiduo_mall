@@ -11,5 +11,6 @@ urlpatterns = [
     url(r'^logout/$',views.LogoutView.as_view(), name='logout'),
     url(r'^user_center_info/$',views.UserCenterInfo.as_view(), name='user_center_info'),
     url(r'^emails/$',views.Save_EmailView.as_view(), name='email'),
+    url(r'^emails/verification/$',views.EmailVerifyView.as_view(), name='email'),
 
 ]

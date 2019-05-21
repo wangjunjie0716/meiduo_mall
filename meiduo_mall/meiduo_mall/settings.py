@@ -210,3 +210,6 @@ EMAIL_HOST_USER = 'junjie90716@163.com'
 EMAIL_HOST_PASSWORD = 'a12345678'
 #收件人看到的发件人
 EMAIL_FROM = '美多商城<junjie90716@163.com>'
+
+
+EMAIL_VERIFY_URL = 'http://www.meiduo.site:8000/emails/verification/'
