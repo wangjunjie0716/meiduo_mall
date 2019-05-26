@@ -1,5 +1,4 @@
 import json
-
 from django.contrib.auth import login, authenticate, logout
 
 from django.shortcuts import render, redirect
@@ -8,11 +7,10 @@ import re
 from django import http
 from django.urls import reverse
 from django_redis import get_redis_connection
-
-from apps.users.models import User
+from utils.views import LoginRequiredJSONMixin
+from apps.users.models import User, Address
 from django.db import DatabaseError
 
-# Create your views here.
 from apps.users.utils import generic_verify_email_url, check_veryfy_email_token
 from apps.views import logger
 from utils.response_code import RETCODE
@@ -275,9 +273,232 @@ class EmailVerifyView(View):
         return redirect(reverse('users:user_center_info'))
 
 
+class AddressView(LoginRequiredMixin,View):
+
+    def get(self,request):
+        """
+        1.必须是登陆用户
+        2.查询登陆用户的地址信息 [Address,Address]
+        3.对列表数据进行转换为字典列表
+        4.传递给模板
+        """
+        # 2.查询登陆用户的地址信息 [Address,Address]
+        addresses = Address.objects.filter(user=request.user,is_deleted=False)
+        # 3.对列表数据进行转换为字典列表
+        addresses_list = []
+        for address in addresses:
+            addresses_list.append({
+                "id": address.id,
+                "title": address.title,
+                "receiver": address.receiver,
+                "province": address.province.name,
+                "province_id": address.province_id,
+                "city": address.city.name,
+                "city_id": address.city_id,
+                "district": address.district.name,
+                "district_id": address.district_id,
+                "place": address.place,
+                "mobile": address.mobile,
+                "tel": address.tel,
+                "email": address.email
+            })
+        # 4.传递给模板
+        context = {
+            'addresses':addresses_list,
+            'default_address_id':request.user.default_address_id
+
+        }
+        return render(request,'user_center_site.html',context=context)
+
+class CreateAddressView(LoginRequiredJSONMixin,View):
+    """
+    需求:
+        当用户填写完新增数据之后,点击新增按钮,需要让前端将 收货人等信息提交给后端
+
+    后端:
+
+        大体步骤:
+        1.判断当前用户是否登陆
+        2.接收参数
+        3.验证参数
+        4.数据入库
+        5.返回相应
+
+        请求方式和路由:
+            POST    /addresses/create/
+    """
+
+    def post(self,request):
+
+        #0 判断用户的地址数量是否超过20个
+        count = Address.objects.filter(user=request.user,is_deleted=False).count()
+        if count > 20:
+            return http.JsonResponse({'code':RETCODE.THROTTLINGERR,'errmsg':'个数超过上限'})
+
+        # 1.判断当前用户是否登陆
+        # if request.user.is_authenticated
+
+        # 2.接收参数
+        json_dict = json.loads(request.body.decode())
+        receiver = json_dict.get('receiver')
+        province_id = json_dict.get('province_id')
+        city_id = json_dict.get('city_id')
+        district_id = json_dict.get('district_id')
+        place = json_dict.get('place')
+        mobile = json_dict.get('mobile')
+        tel = json_dict.get('tel')
+        email = json_dict.get('email')
+
+        # 校验参数
+        if not all([receiver, province_id, city_id, district_id, place, mobile]):
+            return http.HttpResponseBadRequest('缺少必传参数')
+        if not re.match(r'^1[3-9]\d{9}$', mobile):
+            return http.HttpResponseBadRequest('参数mobile有误')
+        if tel:
+            if not re.match(r'^(0[0-9]{2,3}-)?([2-9][0-9]{6,7})+(-[0-9]{1,4})?$', tel):
+                return http.HttpResponseBadRequest('参数tel有误')
+        if email:
+            if not re.match(r'^[a-z0-9][\w\.\-]*@[a-z0-9\-]+(\.[a-z]{2,5}){1,2}$', email):
+                return http.HttpResponseBadRequest('参数email有误')
+        # 4.数据入库
+        try:
+            address = Address.objects.create(
+                user=request.user,
+                title=receiver,
+                receiver=receiver,
+                province_id=province_id,
+                city_id=city_id,
+                district_id=district_id,
+                place=place,
+                mobile=mobile,
+                tel=tel,
+                email=email
+            )
+
+            # 如果没有默认地址我们就设置一个默认地址
+            if not request.user.default_address:
+                request.user.default_address=address
+                request.user.save()
+
+        except Exception as e:
+            logger.error(e)
+            return http.JsonResponse({'code':RETCODE.DBERR,'errmsg':'数据库操作失败'})
+        # 5.返回相应
+        # 新增地址成功，将新增的地址响应给前端实现局部刷新
+        address_dict = {
+            "id": address.id,
+            "title": address.title,
+            "receiver": address.receiver,
+            "province": address.province.name,
+            "city": address.city.name,
+            "district": address.district.name,
+            "place": address.place,
+            "mobile": address.mobile,
+            "tel": address.tel,
+            "email": address.email
+        }
+        return http.JsonResponse({'code':RETCODE.OK,'errmsg':'ok','address':address_dict})
 
 
+class UpdateDestoryAddressView(LoginRequiredJSONMixin,View):
+    """
+    需求: 当用户修改了地址信息之后,需要让前端将 这个信息全都收集过去
+    后端:
 
+        1.判断用户是否登陆
+        2.根据传递过来的更新指定的地址信息
+        3.更新
+        4.返回相应
+
+    请求方式和路由
+        PUT addresses/id/
+    """
+    def put(self,request,address_id):
+        json_dict = json.loads(request.body.decode())
+        receiver = json_dict.get('receiver')
+        province_id = json_dict.get('province_id')
+        city_id = json_dict.get('city_id')
+        district_id = json_dict.get('district_id')
+        place = json_dict.get('place')
+        mobile = json_dict.get('mobile')
+        tel = json_dict.get('tel')
+        email = json_dict.get('email')
+
+        # 2.根据传递过来的更新指定的地址信息
+        # address = Address.objects.get(pk=address_id)
+        # address.recever=data.get('recever')
+        # 3.更新
+        try:
+            # 更新成功之后,返回 1 表示更新成功
+            # 返回 0 表示更新失败
+
+            Address.objects.filter(pk=address_id).update(
+                user=request.user,
+                title=receiver,
+                receiver=receiver,
+                province_id=province_id,
+                city_id=city_id,
+                district_id=district_id,
+                place=place,
+                mobile=mobile,
+                tel=tel,
+                email=email
+            )
+            # 再次查询一下地址信息
+            address = Address.objects.get(pk=address_id)
+        except Exception as e:
+            logger.error(e)
+            return http.JsonResponse({'code':RETCODE.DBERR})
+
+        # 4.返回相应
+        address_dict = {
+            "id": address.id,
+            "title": address.title,
+            "receiver": address.receiver,
+            "province": address.province.name,
+            "city": address.city.name,
+            "district": address.district.name,
+            "place": address.place,
+            "mobile": address.mobile,
+            "tel": address.tel,
+            "email": address.email
+        }
+        return http.JsonResponse({'address':address_dict,'code':RETCODE.OK})
+
+    def delete(self,request,address_id):
+        try:
+            address = Address.objects.get(pk=address_id)
+
+            # address.delete()
+            address.is_deleted=True
+            address.save()
+        except Exception as e:
+            pass
+
+        return http.JsonResponse({'code':RETCODE.OK})
+
+
+"""
+增
+    1.接收数据
+    2.验证数据
+    3.数据入库
+    4.返回相应
+删
+    1.根据id进行查询
+    2.删除就行
+改
+    1.先接收要修改哪个数据(根据id进行查询)
+    2.接收修改之后的数据
+    3.验证数据
+    4.更新数据(保存数据)
+    5.返回相应
+查
+    1.根据已知条件进行查询
+    2.查询出来的是对象列表,我们需要将对象列表转换为字典
+    3.返回数据
+
+"""
 
 
 

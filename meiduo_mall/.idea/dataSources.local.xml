@@ -1,16 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="dataSourceStorageLocal">
-    <data-source name="@localhost" uuid="edb1a086-84f9-4f7b-ab6a-1e2150d2a7be">
-      <database-info product="MySQL" version="5.7.26-0ubuntu0.16.04.1" jdbc-version="4.0" driver-name="MySQL Connector Java" driver-version="mysql-connector-java-5.1.47 ( Revision: fe1903b1ecb4a96a917f7ed3190d80c049b1de29 )">
-        <extra-name-characters>#@</extra-name-characters>
-        <identifier-quote-string>`</identifier-quote-string>
-      </database-info>
-      <case-sensitivity plain-identifiers="exact" quoted-identifiers="exact" />
-      <secret-storage>master_key</secret-storage>
-      <user-name>root</user-name>
-      <resolve-scope>:</resolve-scope>
-    </data-source>
     <data-source name="meiduo_mall_40@localhost" uuid="d2d22252-95f0-4bf0-ba8c-faf9ec8f32d1">
       <database-info product="MySQL" version="5.7.26-0ubuntu0.16.04.1" jdbc-version="4.0" driver-name="MySQL Connector Java" driver-version="mysql-connector-java-5.1.47 ( Revision: fe1903b1ecb4a96a917f7ed3190d80c049b1de29 )">
         <extra-name-characters>#@</extra-name-characters>
@@ -19,6 +9,16 @@
       <case-sensitivity plain-identifiers="exact" quoted-identifiers="exact" />
       <secret-storage>master_key</secret-storage>
       <user-name>root</user-name>
+      <resolve-scope>meiduo_mall_40:</resolve-scope>
+    </data-source>
+    <data-source name="Django default" uuid="dd21aa94-4b3f-4dd2-bbc7-52e3f8b55ec0">
+      <database-info product="MySQL" version="5.7.26-0ubuntu0.16.04.1" jdbc-version="4.0" driver-name="MySQL Connector Java" driver-version="mysql-connector-java-5.1.47 ( Revision: fe1903b1ecb4a96a917f7ed3190d80c049b1de29 )">
+        <extra-name-characters>#@</extra-name-characters>
+        <identifier-quote-string>`</identifier-quote-string>
+      </database-info>
+      <case-sensitivity plain-identifiers="exact" quoted-identifiers="exact" />
+      <user-name>root</user-name>
+      <user-password>dfc7dfd3dfd9dfdbdfc6</user-password>
       <resolve-scope>meiduo_mall_40:</resolve-scope>
     </data-source>
   </component>

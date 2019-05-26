@@ -39,6 +39,7 @@ var vm = new Vue({
         // 默认地址id
         this.default_address_id = default_address_id;
     },
+ //watch 观察
     watch: {
         // 监听到省份id变化
         'form_address.province_id': function () {
@@ -49,8 +50,9 @@ var vm = new Vue({
                 })
                     .then(response => {
                         if (response.data.code == '0') {
-                            this.cities = response.data.sub_data.subs;
-                        } else {
+                            // this.cities = response.data.sub_data.subs;
+                            this.cities = response.data.sub_list; 
+			 } else {
                             console.log(response.data);
                             this.cities = [];
                         }
@@ -70,7 +72,8 @@ var vm = new Vue({
                 })
                     .then(response => {
                         if (response.data.code == '0') {
-                            this.districts = response.data.sub_data.subs;
+                            //this.districts = response.data.sub_data.subs;
+			    this.districts = response.data.sub_list;
                         } else {
                             console.log(response.data);
                             this.districts = [];
@@ -92,7 +95,7 @@ var vm = new Vue({
             })
                 .then(response => {
                     if (response.data.code == '0') {
-                        this.provinces = response.data.province_list;
+                         this.provinces = response.data.provinces;
                     } else {
                         console.log(response.data);
                         this.provinces = [];

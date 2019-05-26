@@ -12,5 +12,7 @@ urlpatterns = [
     url(r'^user_center_info/$',views.UserCenterInfo.as_view(), name='user_center_info'),
     url(r'^emails/$',views.Save_EmailView.as_view(), name='email'),
     url(r'^emails/verification/$',views.EmailVerifyView.as_view(), name='email'),
-
+    url(r'^Address/$',views.AddressView.as_view(), name='address'),
+    url(r'^addresses/create/$',views.CreateAddressView.as_view(), name='address_create'),
+    url(r'^addresses/(?P<address_id>\d+)/$',views.UpdateDestoryAddressView.as_view(),name='updateaddress'),
 ]
